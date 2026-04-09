@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Sort Tiles: Tap Away</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{min-height:100vh;background:#1a0010;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;padding:16px;}
+  #game-wrap{background:linear-gradient(135deg,#2d0a1e,#6b1a3a,#3d0f28);border-radius:16px;padding:16px;max-width:420px;width:100%;font-family:system-ui,sans-serif;}
+  #topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  #title-txt{font-size:17px;font-weight:600;color:#ffd6e8;letter-spacing:0.08em;}
+  .stat-box{background:rgba(255,255,255,0.1);border-radius:8px;padding:5px 12px;text-align:center;border:1px solid rgba(255,182,206,0.2);}
+  .stat-val{font-size:17px;font-weight:600;color:#ffd6e8;}
+  .stat-lbl{font-size:10px;color:#d47a9a;text-transform:uppercase;letter-spacing:0.05em;}
+  #tubes-area{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:12px;min-height:210px;align-items:flex-end;}
+  .tube{display:flex;flex-direction:column-reverse;align-items:center;justify-content:flex-start;width:48px;min-height:190px;background:rgba(255,255,255,0.07);border-radius:10px;border:2px solid rgba(255,182,206,0.18);padding:4px;gap:3px;cursor:pointer;transition:border-color 0.15s,transform 0.15s;}
+  .tube:hover{border-color:rgba(255,105,180,0.6);}
+  .tube.selected{border-color:#ff69b4;transform:translateY(-8px);background:rgba(255,105,180,0.15);}
+  .tube.complete{border-color:#ff69b4;opacity:0.65;cursor:default;}
+  .tile-block{width:40px;height:36px;border-radius:7px;flex-shrink:0;}
+  .tube-empty-hint{font-size:10px;color:rgba(255,255,255,0.2);text-align:center;padding-top:8px;}
+  #btn-row{display:flex;gap:8px;justify-content:center;margin-bottom:10px;}
+  .gbtn{background:rgba(255,255,255,0.09);color:#ffd6e8;border:1.5px solid rgba(255,182,206,0.22);border-radius:8px;padding:7px 16px;font-size:13px;font-weight:500;cursor:pointer;transition:background 0.15s,border-color 0.15s;}
+  .gbtn:hover{background:rgba(255,105,180,0.2);border-color:rgba(255,105,180,0.5);}
+  .gbtn.undo{border-color:#d4a017;color:#f5d060;}
+  .gbtn.undo:hover{background:rgba(212,160,23,0.15);}
+  .gbtn.next{border-color:#ff69b4;color:#ffb6d9;}
+  .gbtn.next:hover{background:rgba(255,105,180,0.2);}
+  #msg{text-align:center;font-size:14px;font-weight:500;min-height:22px;color:#d47a9a;margin-bottom:6px;}
+  #msg.win{color:#ff69b4;font-size:16px;}
+  #msg.warn{color:#f59e0b;}
+  #level-row{display:flex;gap:5px;justify-content:center;flex-wrap:wrap;margin-bottom:10px;}
+  .lvl-btn{background:rgba(255,255,255,0.07);color:#d47a9a;border:1.5px solid rgba(255,182,206,0.18);border-radius:20px;padding:4px 12px;font-size:11px;cursor:pointer;transition:all 0.15s;}
+  .lvl-btn:hover{background:rgba(255,105,180,0.2);color:#ffd6e8;}
+  .lvl-btn.active{background:#c0395e;color:#ffe0ee;border-color:#c0395e;font-weight:600;}
+  .lvl-btn.locked{opacity:0.3;cursor:not-allowed;}
+  #progress-bar{height:4px;background:rgba(255,255,255,0.1);border-radius:2px;margin-bottom:10px;overflow:hidden;}
+  #progress-fill{height:100%;background:#ff69b4;border-radius:2px;transition:width 0.4s;}
+  #how-to{background:rgba(255,255,255,0.05);border-radius:10px;padding:10px 14px;margin-bottom:12px;border:1px solid rgba(255,182,206,0.12);}
+  #how-to p{font-size:12px;color:#d47a9a;line-height:1.6;}
+  #how-to strong{color:#ffd6e8;}
+</style>
+</head>
+<body>
+<div id="game-wrap">
+  <div id="topbar">
+    <span id="title-txt">Sort Tiles</span>
+    <div style="display:flex;gap:8px;">
+      <div class="stat-box"><div class="stat-val" id="moves-val">0</div><div class="stat-lbl">Moves</div></div>
+      <div class="stat-box"><div class="stat-val" id="done-val">0/0</div><div class="stat-lbl">Done</div></div>
+      <div class="stat-box"><div class="stat-val" id="lvl-val">1</div><div class="stat-lbl">Level</div></div>
+    </div>
+  </div>
+  <div id="progress-bar"><div id="progress-fill" style="width:0%"></div></div>
+  <div id="how-to"><p><strong>How to play:</strong> Tap a tube to select it, then tap another tube to move the top tile. You can only stack matching colors or move to an empty tube. Sort all tiles by color to win!</p></div>
+  <div id="level-row"></div>
+  <div id="msg"></div>
+  <div id="tubes-area"></div>
+  <div id="btn-row">
+    <button class="gbtn undo" id="undoBtn">Undo</button>
+    <button class="gbtn" id="restartBtn">Restart</button>
+    <button class="gbtn next" id="nextBtn" style="display:none;">Next level</button>
+  </div>
+</div>
+<script>
+const COLORS=[
+  {bg:'#ef4444',symbol:'R'},{bg:'#3b82f6',symbol:'B'},{bg:'#10b981',symbol:'G'},
+  {bg:'#f59e0b',symbol:'Y'},{bg:'#a78bfa',symbol:'P'},{bg:'#f97316',symbol:'O'},
+  {bg:'#ec4899',symbol:'K'},{bg:'#06b6d4',symbol:'C'},
+];
+const LEVELS=[
+  {label:'Lv 1',colors:2,tubeSize:3,extraEmpty:1},
+  {label:'Lv 2',colors:3,tubeSize:3,extraEmpty:1},
+  {label:'Lv 3',colors:3,tubeSize:4,extraEmpty:1},
+  {label:'Lv 4',colors:4,tubeSize:4,extraEmpty:1},
+  {label:'Lv 5',colors:4,tubeSize:4,extraEmpty:2},
+  {label:'Lv 6',colors:5,tubeSize:4,extraEmpty:1},
+  {label:'Lv 7',colors:5,tubeSize:4,extraEmpty:2},
+  {label:'Lv 8',colors:6,tubeSize:4,extraEmpty:1},
+  {label:'Lv 9',colors:6,tubeSize:4,extraEmpty:2},
+  {label:'Lv 10',colors:7,tubeSize:4,extraEmpty:2},
+  {label:'Lv 11',colors:7,tubeSize:5,extraEmpty:2},
+  {label:'Lv 12',colors:8,tubeSize:5,extraEmpty:2},
+];
+let currentLevel=0,unlockedLevel=0,tubes=[],tubeSize=4,selected=null,moves=0,history=[];
+function initLevel(i){
+  if(i>unlockedLevel)return;
+  currentLevel=i;const cfg=LEVELS[i];
+  tubeSize=cfg.tubeSize;moves=0;selected=null;history=[];
+  const cols=COLORS.slice(0,cfg.colors);let pool=[];
+  cols.forEach(c=>{for(let j=0;j<tubeSize;j++)pool.push(c);});
+  pool=shuffle(pool);tubes=[];
+  for(let j=0;j<cfg.colors;j++)tubes.push(pool.splice(0,tubeSize));
+  for(let j=0;j<cfg.extraEmpty;j++)tubes.push([]);
+  document.getElementById('moves-val').textContent=0;
+  document.getElementById('lvl-val').textContent=i+1;
+  document.getElementById('nextBtn').style.display='none';
+  updateDone();updateProgress();setMsg('');renderLevelBtns();render();
+}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function deepClone(t){return t.map(tube=>tube.map(c=>({...c})));}
+function isTubeComplete(tube){if(tube.length!==tubeSize)return false;return tube.every(c=>c.symbol===tube[0].symbol);}
+function updateDone(){const done=tubes.filter(t=>isTubeComplete(t)).length;document.getElementById('done-val').textContent=done+'/'+LEVELS[currentLevel].colors;}
+function updateProgress(){document.getElementById('progress-fill').style.width=Math.round((unlockedLevel/LEVELS.length)*100)+'%';}
+function checkWin(){
+  if(tubes.filter(t=>isTubeComplete(t)).length===LEVELS[currentLevel].colors){
+    if(currentLevel>=unlockedLevel&&currentLevel<LEVELS.length-1){unlockedLevel=currentLevel+1;updateProgress();}
+    setMsg(currentLevel===LEVELS.length-1?'All levels complete! You win!':'Level complete!','win');
+    if(currentLevel<LEVELS.length-1)document.getElementById('nextBtn').style.display='';
+    renderLevelBtns();render();return true;
+  }return false;
+}
+function canMove(from,to){
+  if(from===to)return false;
+  const fT=tubes[from],tT=tubes[to];
+  if(fT.length===0||tT.length===tubeSize)return false;
+  if(tT.length===0)return true;
+  return fT[fT.length-1].symbol===tT[tT.length-1].symbol;
+}
+function doMove(from,to){
+  history.push(deepClone(tubes));
+  tubes[to].push(tubes[from].pop());
+  moves++;document.getElementById('moves-val').textContent=moves;updateDone();
+}
+function handleTubeClick(idx){
+  if(document.getElementById('msg').classList.contains('win'))return;
+  if(selected===null){
+    if(tubes[idx].length===0||isTubeComplete(tubes[idx]))return;
+    selected=idx;
+  } else {
+    if(selected===idx){selected=null;render();return;}
+    if(canMove(selected,idx)){doMove(selected,idx);selected=null;render();checkWin();}
+    else{setMsg('Cannot place there','warn');setTimeout(()=>{if(!document.getElementById('msg').classList.contains('win'))setMsg('');},900);selected=idx;render();}
+    return;
+  }render();
+}
+function setMsg(txt,cls=''){const el=document.getElementById('msg');el.textContent=txt;el.className=cls||'';}
+function render(){
+  const area=document.getElementById('tubes-area');area.innerHTML='';
+  tubes.forEach((tube,idx)=>{
+    const div=document.createElement('div');
+    div.className='tube'+(selected===idx?' selected':'')+(isTubeComplete(tube)?' complete':'');
+    div.style.minHeight=(tubeSize*39+20)+'px';
+    div.addEventListener('click',()=>handleTubeClick(idx));
+    if(tube.length===0){const h=document.createElement('div');h.className='tube-empty-hint';h.textContent='empty';div.appendChild(h);}
+    tube.forEach(c=>{const b=document.createElement('div');b.className='tile-block';b.style.background=c.bg;div.appendChild(b);});
+    area.appendChild(div);
+  });
+}
+function renderLevelBtns(){
+  const row=document.getElementById('level-row');row.innerHTML='';
+  LEVELS.forEach((l,i)=>{
+    const btn=document.createElement('button');
+    const locked=i>unlockedLevel;
+    btn.className='lvl-btn'+(i===currentLevel?' active':'')+(locked?' locked':'');
+    btn.textContent=l.label;
+    btn.addEventListener('click',()=>{if(!locked)initLevel(i);});
+    row.appendChild(btn);
+  });
+}
+document.getElementById('undoBtn').addEventListener('click',()=>{
+  if(!history.length)return;
+  tubes=history.pop();moves=Math.max(0,moves-1);
+  document.getElementById('moves-val').textContent=moves;
+  selected=null;updateDone();setMsg('');render();
+});
+document.getElementById('restartBtn').addEventListener('click',()=>initLevel(currentLevel));
+document.getElementById('nextBtn').addEventListener('click',()=>{if(currentLevel<LEVELS.length-1)initLevel(currentLevel+1);});
+renderLevelBtns();
+initLevel(0);
+</script>
+</body>
+</html>
